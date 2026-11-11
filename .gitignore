@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Local runtime data
+.data/
+*.log
+logs/
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp

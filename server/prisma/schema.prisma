@@ -1,0 +1,1122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Employee {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_code     String    @unique @map("employee_code")
+  full_name         String    @map("full_name")
+  email             String
+  phone             String?
+  department        String
+  designation       String
+  employment_level  String    @default("IC") @map("employment_level")
+  reports_to        String?   @map("reports_to") @db.Uuid
+  date_of_joining   DateTime  @default(dbgenerated("CURRENT_DATE")) @map("date_of_joining") @db.Date
+  employment_status String    @default("Active") @map("employment_status")
+  exit_date         DateTime? @map("exit_date") @db.Date
+  password_hash     String    @map("password_hash")
+  role              String    @default("Employee")
+  is_active         Boolean   @default(true) @map("is_active")
+  created_at        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  manager   Employee?  @relation("EmployeeReportsTo", fields: [reports_to], references: [id], onDelete: SetNull)
+  directReports Employee[] @relation("EmployeeReportsTo")
+
+  @@map("employees")
+}
+
+model AuditLog {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_id    String?   @map("actor_id") @db.Uuid
+  action      String
+  entity_type String    @map("entity_type")
+  entity_id   String?   @map("entity_id") @db.Uuid
+  details     Json      @default("{}")
+  ip_address  String?   @map("ip_address")
+  user_agent  String?   @map("user_agent")
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([actor_id])
+  @@index([entity_type, entity_id])
+  @@index([created_at(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model WorkforceProject {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  department  String?
+  status      String    @default("Planning")
+  start_date  DateTime? @map("start_date") @db.Date
+  end_date    DateTime? @map("end_date") @db.Date
+  budget      Decimal?  @db.Decimal(14, 2)
+  description String?
+  created_by  String?   @map("created_by") @db.Uuid
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  allocations WorkforceAllocation[]
+
+  @@map("workforce_projects")
+}
+
+model WorkforceAllocation {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id         String    @map("project_id") @db.Uuid
+  employee_id        String    @map("employee_id") @db.Uuid
+  allocation_percent Int       @map("allocation_percent")
+  role               String?
+  start_date         DateTime? @map("start_date") @db.Date
+  end_date           DateTime? @map("end_date") @db.Date
+  status             String    @default("Active")
+  created_by         String?   @map("created_by") @db.Uuid
+  created_at         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  project WorkforceProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@index([project_id])
+  @@map("workforce_allocations")
+}
+
+model WorkforceForecast {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  department         String
+  period             String
+  current_headcount  Int       @default(0) @map("current_headcount")
+  forecast_headcount Int       @default(0) @map("forecast_headcount")
+  gap                Int       @default(0)
+  cost_impact        Decimal?  @map("cost_impact") @db.Decimal(14, 2)
+  notes              String?
+  created_by         String?   @map("created_by") @db.Uuid
+  created_at         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([department])
+  @@map("workforce_forecasts")
+}
+
+model EmployeeSkill {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id      String   @map("employee_id") @db.Uuid
+  skill            String
+  proficiency      String
+  years_experience Decimal? @default(0) @map("years_experience") @db.Decimal(4, 1)
+  updated_by       String?  @map("updated_by") @db.Uuid
+  created_at       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([employee_id, skill])
+  @@index([employee_id])
+  @@map("employee_skills")
+}
+
+model SuccessionPlan {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  position          String
+  department        String
+  current_holder_id String?  @map("current_holder_id") @db.Uuid
+  successor_id      String   @map("successor_id") @db.Uuid
+  readiness         String
+  notes             String?
+  created_by        String?  @map("created_by") @db.Uuid
+  created_at        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("succession_plans")
+}
+
+model OffboardingCase {
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id               String    @map("employee_id") @db.Uuid
+  resignation_date          DateTime  @map("resignation_date") @db.Date
+  last_working_date         DateTime  @map("last_working_date") @db.Date
+  reason                    String?
+  status                    String    @default("Resignation Submitted")
+  knowledge_transfer_status String    @default("Pending") @map("knowledge_transfer_status")
+  exit_interview_date       DateTime? @map("exit_interview_date") @db.Date
+  exit_interview_notes        String?   @map("exit_interview_notes")
+  final_settlement_amount   Decimal?  @map("final_settlement_amount") @db.Decimal(14, 2)
+  settlement_status         String    @default("Pending") @map("settlement_status")
+  alumni_notes              String?   @map("alumni_notes")
+  created_by                String?   @map("created_by") @db.Uuid
+  completed_at              DateTime? @map("completed_at") @db.Timestamptz(6)
+  withdrawn_at              DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+  created_at                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at                DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  clearances     OffboardingClearance[]
+  exit_documents ExitDocument[]
+
+  @@index([employee_id])
+  @@index([status])
+  @@map("offboarding_cases")
+}
+
+model OffboardingClearance {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id     String    @map("case_id") @db.Uuid
+  department  String
+  status      String    @default("Pending")
+  approved_by String?   @map("approved_by") @db.Uuid
+  approved_at DateTime? @map("approved_at") @db.Timestamptz(6)
+  notes       String?
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  offboarding_case OffboardingCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@index([case_id])
+  @@map("offboarding_clearances")
+}
+
+model ExitDocument {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id       String   @map("case_id") @db.Uuid
+  employee_id   String   @map("employee_id") @db.Uuid
+  document_type String   @map("document_type")
+  file_name     String   @map("file_name")
+  content       String?
+  issued_by     String?  @map("issued_by") @db.Uuid
+  issued_at     DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  offboarding_case OffboardingCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@map("exit_documents")
+}
+
+model AttendanceRecord {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id     String   @map("employee_id") @db.Uuid
+  date            DateTime @db.Date
+  clock_in        String?  @map("clock_in")
+  clock_out       String?  @map("clock_out")
+  status          String   @default("Present")
+  overtime_hours  Decimal  @default(0) @map("overtime_hours") @db.Decimal(5, 2)
+  leave_type      String?  @map("leave_type")
+  notes           String?
+  source          String?
+  created_by      String?  @map("created_by") @db.Uuid
+  created_at      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([employee_id, date])
+  @@index([date])
+  @@index([employee_id])
+  @@map("attendance_records")
+}
+
+model LeaveRequest {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id  String    @map("employee_id") @db.Uuid
+  leave_type   String    @map("leave_type")
+  start_date   DateTime  @map("start_date") @db.Date
+  end_date     DateTime  @map("end_date") @db.Date
+  days         Int
+  reason       String
+  status       String    @default("Pending")
+  applied_by   String?   @map("applied_by") @db.Uuid
+  approved_by  String?   @map("approved_by") @db.Uuid
+  approved_at  DateTime? @map("approved_at") @db.Timestamptz(6)
+  decision_note String?  @map("decision_note")
+  cancelled_at DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+model Shift {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  date        DateTime @db.Date
+  shift_name  String   @map("shift_name")
+  start_time  String   @map("start_time")
+  end_time    String   @map("end_time")
+  created_by  String?  @map("created_by") @db.Uuid
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id, date])
+  @@map("shifts")
+}
+
+model Holiday {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  date        DateTime @unique @db.Date
+  description String?
+  created_by  String?  @map("created_by") @db.Uuid
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("holidays")
+}
+
+model SalaryGrade {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  grade       String   @unique
+  min_salary  Decimal  @map("min_salary") @db.Decimal(14, 2)
+  max_salary  Decimal  @map("max_salary") @db.Decimal(14, 2)
+  currency    String   @default("INR")
+  description String?
+  created_by  String?  @map("created_by") @db.Uuid
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  compensations EmployeeCompensation[]
+
+  @@map("salary_grades")
+}
+
+model EmployeeCompensation {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id    String    @unique @map("employee_id") @db.Uuid
+  grade_id       String?   @map("grade_id") @db.Uuid
+  base_salary    Decimal   @map("base_salary") @db.Decimal(14, 2)
+  allowances     Decimal   @default(0) @db.Decimal(14, 2)
+  deductions     Decimal   @default(0) @db.Decimal(14, 2)
+  tax_percent    Decimal   @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  currency       String    @default("INR")
+  effective_date DateTime? @map("effective_date") @db.Date
+  updated_by     String?   @map("updated_by") @db.Uuid
+  created_at     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  salary_grade SalaryGrade? @relation(fields: [grade_id], references: [id], onDelete: SetNull)
+
+  @@map("employee_compensation")
+}
+
+model Benefit {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  provider    String?
+  cost        Decimal  @default(0) @db.Decimal(14, 2)
+  active      Boolean  @default(true)
+  created_by  String?  @map("created_by") @db.Uuid
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  enrollments BenefitEnrollment[]
+
+  @@map("benefits")
+}
+
+model BenefitEnrollment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  benefit_id  String   @map("benefit_id") @db.Uuid
+  status      String   @default("Active")
+  enrolled_at DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(6)
+  enrolled_by String?  @map("enrolled_by") @db.Uuid
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  benefit Benefit @relation(fields: [benefit_id], references: [id], onDelete: Cascade)
+
+  @@map("benefit_enrollments")
+}
+
+model Reward {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  title       String
+  points      Int
+  note        String?
+  awarded_by  String?  @map("awarded_by") @db.Uuid
+  awarded_at  DateTime @default(now()) @map("awarded_at") @db.Timestamptz(6)
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@map("rewards")
+}
+
+model Reimbursement {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id         String    @map("employee_id") @db.Uuid
+  category            String
+  amount              Decimal   @db.Decimal(14, 2)
+  description         String
+  receipt_url         String?   @map("receipt_url")
+  status              String    @default("Submitted")
+  manager_id          String?   @map("manager_id") @db.Uuid
+  manager_approved_by String?   @map("manager_approved_by") @db.Uuid
+  manager_approved_at DateTime? @map("manager_approved_at") @db.Timestamptz(6)
+  hr_approved_by      String?   @map("hr_approved_by") @db.Uuid
+  hr_approved_at      DateTime? @map("hr_approved_at") @db.Timestamptz(6)
+  rejected_by         String?   @map("rejected_by") @db.Uuid
+  rejected_at         DateTime? @map("rejected_at") @db.Timestamptz(6)
+  decision_note       String?   @map("decision_note")
+  payroll_run_id      String?   @map("payroll_run_id") @db.Uuid
+  submitted_by        String?   @map("submitted_by") @db.Uuid
+  paid_at             DateTime? @map("paid_at") @db.Timestamptz(6)
+  created_at          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  payroll_run PayrollRun? @relation(fields: [payroll_run_id], references: [id], onDelete: SetNull)
+
+  @@index([employee_id])
+  @@index([status])
+  @@map("reimbursements")
+}
+
+model PayrollRun {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  period           String
+  status           String    @default("Draft")
+  processed_by     String?   @map("processed_by") @db.Uuid
+  processed_at     DateTime? @map("processed_at") @db.Timestamptz(6)
+  disbursed_by     String?   @map("disbursed_by") @db.Uuid
+  disbursed_at     DateTime? @map("disbursed_at") @db.Timestamptz(6)
+  total_gross      Decimal   @default(0) @map("total_gross") @db.Decimal(14, 2)
+  total_deductions Decimal   @default(0) @map("total_deductions") @db.Decimal(14, 2)
+  total_net        Decimal   @default(0) @map("total_net") @db.Decimal(14, 2)
+  employee_count   Int       @default(0) @map("employee_count")
+  skipped          Json      @default("[]")
+  created_by       String?   @map("created_by") @db.Uuid
+  created_at       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  payslips       Payslip[]
+  reimbursements Reimbursement[]
+
+  @@map("payroll_runs")
+}
+
+model Payslip {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  run_id               String   @map("run_id") @db.Uuid
+  employee_id          String   @map("employee_id") @db.Uuid
+  period               String
+  basic                Decimal  @default(0) @db.Decimal(14, 2)
+  allowances           Decimal  @default(0) @db.Decimal(14, 2)
+  reimbursements       Decimal  @default(0) @db.Decimal(14, 2)
+  gross_pay            Decimal  @default(0) @map("gross_pay") @db.Decimal(14, 2)
+  deductions           Decimal  @default(0) @db.Decimal(14, 2)
+  attendance_deduction Decimal  @default(0) @map("attendance_deduction") @db.Decimal(14, 2)
+  unpaid_leave_days    Int      @default(0) @map("unpaid_leave_days")
+  tax                  Decimal  @default(0) @db.Decimal(14, 2)
+  net_pay              Decimal  @default(0) @map("net_pay") @db.Decimal(14, 2)
+  currency             String   @default("INR")
+  status               String   @default("Processed")
+  created_at           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  payroll_run PayrollRun @relation(fields: [run_id], references: [id], onDelete: Cascade)
+
+  @@unique([run_id, employee_id])
+  @@index([employee_id])
+  @@index([period])
+  @@map("payslips")
+}
+
+model TaxRecord {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id     String    @map("employee_id") @db.Uuid
+  period          String
+  taxable_income  Decimal   @default(0) @map("taxable_income") @db.Decimal(14, 2)
+  tax_amount      Decimal   @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  status          String    @default("Draft")
+  filed_at        DateTime? @map("filed_at") @db.Timestamptz(6)
+  created_by      String?   @map("created_by") @db.Uuid
+  created_at      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@map("tax_records")
+}
+
+model OnboardingCase {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id    String?   @map("employee_id") @db.Uuid
+  candidate_name String    @map("candidate_name")
+  email          String?
+  department     String
+  designation    String
+  joining_date   DateTime  @map("joining_date") @db.Date
+  manager_id     String?   @map("manager_id") @db.Uuid
+  status         String    @default("Not Started")
+  progress       Int       @default(0)
+  completed_at   DateTime? @map("completed_at") @db.Timestamptz(6)
+  created_by     String?   @map("created_by") @db.Uuid
+  created_at     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tasks     OnboardingTask[]
+  documents OnboardingDocument[]
+
+  @@index([employee_id])
+  @@index([manager_id])
+  @@map("onboarding_cases")
+}
+
+model OnboardingTask {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id      String    @map("case_id") @db.Uuid
+  employee_id  String?   @map("employee_id") @db.Uuid
+  title        String
+  category     String
+  assigned_to  String?   @map("assigned_to") @db.Uuid
+  due_date     DateTime? @map("due_date") @db.Date
+  status       String    @default("Pending")
+  completed_at DateTime? @map("completed_at") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  onboarding_case OnboardingCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@index([case_id])
+  @@map("onboarding_tasks")
+}
+
+model OnboardingDocument {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_id        String    @map("case_id") @db.Uuid
+  employee_id    String?   @map("employee_id") @db.Uuid
+  document_type  String    @map("document_type")
+  file_name      String?   @map("file_name")
+  status         String    @default("Pending")
+  acknowledged_at DateTime? @map("acknowledged_at") @db.Timestamptz(6)
+  signed_at      DateTime? @map("signed_at") @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  onboarding_case OnboardingCase @relation(fields: [case_id], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_documents")
+}
+
+model JobRequisition {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String
+  department      String
+  position_count  Int       @map("position_count")
+  employment_type String    @default("Full Time") @map("employment_type")
+  budget          Decimal?  @db.Decimal(14, 2)
+  description     String?
+  status          String    @default("Pending Manager")
+  requester_id    String    @map("requester_id") @db.Uuid
+  decision_reason String?   @map("decision_reason")
+  approved_at     DateTime? @map("approved_at") @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  approvals  RequisitionApproval[]
+  openings   JobOpening[]
+  candidates Candidate[]
+
+  @@index([department])
+  @@index([status])
+  @@index([requester_id])
+  @@map("job_requisitions")
+}
+
+model RequisitionApproval {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requisition_id   String   @map("requisition_id") @db.Uuid
+  approver_id      String   @map("approver_id") @db.Uuid
+  step             String
+  status           String
+  is_escalation    Boolean  @default(false) @map("is_escalation")
+  is_self_approval Boolean  @default(false) @map("is_self_approval")
+  reason           String?
+  created_at       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  requisition JobRequisition @relation(fields: [requisition_id], references: [id], onDelete: Cascade)
+
+  @@index([requisition_id])
+  @@map("requisition_approvals")
+}
+
+model JobOpening {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requisition_id  String    @map("requisition_id") @db.Uuid
+  title           String
+  department      String
+  location        String?
+  employment_type String?   @map("employment_type")
+  status          String    @default("Open")
+  posted_at       DateTime? @map("posted_at") @db.Timestamptz(6)
+  created_by      String?   @map("created_by") @db.Uuid
+  created_at      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  requisition JobRequisition @relation(fields: [requisition_id], references: [id], onDelete: Cascade)
+
+  @@map("job_openings")
+}
+
+model Candidate {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requisition_id String   @map("requisition_id") @db.Uuid
+  full_name      String   @map("full_name")
+  email          String
+  phone          String?
+  resume_url     String?  @map("resume_url")
+  stage          String   @default("Applied")
+  status         String   @default("Active")
+  source         String?
+  notes          String?
+  created_by     String?  @map("created_by") @db.Uuid
+  created_at     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  requisition JobRequisition @relation(fields: [requisition_id], references: [id], onDelete: Cascade)
+  interviews  Interview[]
+  offers      Offer[]
+
+  @@unique([requisition_id, email])
+  @@index([requisition_id])
+  @@index([stage])
+  @@map("candidates")
+}
+
+model Interview {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  candidate_id   String   @map("candidate_id") @db.Uuid
+  interviewer_id String   @map("interviewer_id") @db.Uuid
+  scheduled_at   DateTime @map("scheduled_at") @db.Timestamptz(6)
+  mode           String   @default("Video")
+  location       String?
+  status         String   @default("Scheduled")
+  feedback       String?
+  rating         Int?
+  created_by     String?  @map("created_by") @db.Uuid
+  created_at     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+
+  @@index([candidate_id])
+  @@map("interviews")
+}
+
+model Offer {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  candidate_id String    @map("candidate_id") @db.Uuid
+  designation  String
+  salary       Decimal   @db.Decimal(14, 2)
+  currency     String    @default("INR")
+  joining_date DateTime? @map("joining_date") @db.Date
+  status       String    @default("Draft")
+  token        String?   @unique
+  issued_at    DateTime? @map("issued_at") @db.Timestamptz(6)
+  expires_at   DateTime? @map("expires_at") @db.Timestamptz(6)
+  accepted_at  DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revoked_at   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  created_by   String?   @map("created_by") @db.Uuid
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  candidate Candidate @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("offers")
+}
+
+model ReviewCycle {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  period_start DateTime @map("period_start") @db.Date
+  period_end   DateTime @map("period_end") @db.Date
+  status       String   @default("Active")
+  created_by   String?  @map("created_by") @db.Uuid
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  goals              Goal[]
+  performance_reviews PerformanceReview[]
+
+  @@map("review_cycles")
+}
+
+model Goal {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  cycle_id    String?  @map("cycle_id") @db.Uuid
+  title       String
+  description String?
+  target      String?
+  progress    Int      @default(0)
+  weightage   Int      @default(0)
+  status      String   @default("Not Started")
+  manager_id  String?  @map("manager_id") @db.Uuid
+  created_by  String?  @map("created_by") @db.Uuid
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  review_cycle ReviewCycle? @relation(fields: [cycle_id], references: [id], onDelete: SetNull)
+
+  @@index([employee_id])
+  @@index([cycle_id])
+  @@map("goals")
+}
+
+model PerformanceReview {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id      String    @map("employee_id") @db.Uuid
+  cycle_id         String    @map("cycle_id") @db.Uuid
+  reviewer_id      String    @map("reviewer_id") @db.Uuid
+  rating           Int?
+  strengths        String?
+  improvements     String?
+  comments         String?
+  status           String    @default("Draft")
+  submitted_at     DateTime? @map("submitted_at") @db.Timestamptz(6)
+  acknowledged_at  DateTime? @map("acknowledged_at") @db.Timestamptz(6)
+  completed_at     DateTime? @map("completed_at") @db.Timestamptz(6)
+  created_at       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  review_cycle ReviewCycle @relation(fields: [cycle_id], references: [id], onDelete: Cascade)
+
+  @@unique([employee_id, cycle_id])
+  @@index([employee_id])
+  @@map("performance_reviews")
+}
+
+model Feedback {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id      String   @map("employee_id") @db.Uuid
+  from_employee_id String   @map("from_employee_id") @db.Uuid
+  type             String
+  message          String
+  visibility       String   @default("Manager and HR")
+  created_at       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@map("feedback")
+}
+
+model TicketCategory {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String   @unique
+  department          String
+  sla_hours           Int      @default(24) @map("sla_hours")
+  default_assignee_id String?  @map("default_assignee_id") @db.Uuid
+  active              Boolean  @default(true)
+  created_at          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tickets     Ticket[]
+  kb_articles KbArticle[]
+
+  @@map("ticket_categories")
+}
+
+model Ticket {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_no         String    @unique @map("ticket_no")
+  employee_id       String    @map("employee_id") @db.Uuid
+  category_id       String    @map("category_id") @db.Uuid
+  subject           String
+  description       String
+  priority          String    @default("Medium")
+  status            String    @default("Open")
+  assigned_to       String?   @map("assigned_to") @db.Uuid
+  sla_due_at        DateTime? @map("sla_due_at") @db.Timestamptz(6)
+  resolved_at       DateTime? @map("resolved_at") @db.Timestamptz(6)
+  escalation_reason String?   @map("escalation_reason")
+  csat_rating       Int?      @map("csat_rating")
+  csat_comment      String?   @map("csat_comment")
+  csat_at           DateTime? @map("csat_at") @db.Timestamptz(6)
+  created_at        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  category TicketCategory  @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  comments TicketComment[]
+
+  @@index([employee_id])
+  @@index([status])
+  @@index([assigned_to])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticket_id   String   @map("ticket_id") @db.Uuid
+  author_id   String   @map("author_id") @db.Uuid
+  message     String
+  is_internal Boolean  @default(false) @map("is_internal")
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket Ticket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id])
+  @@map("ticket_comments")
+}
+
+model KbArticle {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  content     String
+  category_id String?   @map("category_id") @db.Uuid
+  department  String?
+  status      String    @default("Draft")
+  author_id   String?   @map("author_id") @db.Uuid
+  published_at DateTime? @map("published_at") @db.Timestamptz(6)
+  archived_at DateTime? @map("archived_at") @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  category TicketCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  votes    KbVote[]
+
+  @@index([status])
+  @@map("kb_articles")
+}
+
+model KbVote {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  article_id  String   @map("article_id") @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  vote        String
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  article KbArticle @relation(fields: [article_id], references: [id], onDelete: Cascade)
+
+  @@unique([article_id, employee_id])
+  @@map("kb_votes")
+}
+
+model EmployeeDocument {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id   String   @map("employee_id") @db.Uuid
+  document_type String   @map("document_type")
+  file_name     String   @map("file_name")
+  source_module String   @map("source_module")
+  content       String?
+  issued_by     String?  @map("issued_by") @db.Uuid
+  issued_at     DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+  request_id    String?  @map("request_id") @db.Uuid
+  case_id       String?  @map("case_id") @db.Uuid
+  created_at    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  document_requests DocumentRequest[]
+
+  @@index([employee_id])
+  @@map("employee_documents")
+}
+
+model DocumentRequest {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id        String    @map("employee_id") @db.Uuid
+  document_type      String    @map("document_type")
+  reason             String?
+  status             String    @default("Pending")
+  issued_document_id String?   @map("issued_document_id") @db.Uuid
+  issued_by          String?   @map("issued_by") @db.Uuid
+  issued_at          DateTime? @map("issued_at") @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  issued_document EmployeeDocument? @relation(fields: [issued_document_id], references: [id], onDelete: SetNull)
+
+  @@index([employee_id])
+  @@map("document_requests")
+}
+
+model EngagementSurvey {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  status      String    @default("Draft")
+  start_date  DateTime? @map("start_date") @db.Date
+  end_date    DateTime? @map("end_date") @db.Date
+  created_by  String?   @map("created_by") @db.Uuid
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  questions   EngagementSurveyQuestion[]
+  assignments EngagementSurveyAssignment[]
+
+  @@index([status])
+  @@map("engagement_surveys")
+}
+
+model EngagementSurveyQuestion {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  survey_id     String   @map("survey_id") @db.Uuid
+  question_text String   @map("question_text")
+  question_type String   @default("Rating") @map("question_type")
+  options       Json?    @default("[]")
+  sort_order    Int      @default(0) @map("sort_order")
+  created_at    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  survey    EngagementSurvey @relation(fields: [survey_id], references: [id], onDelete: Cascade)
+  responses EngagementSurveyResponse[]
+
+  @@index([survey_id])
+  @@map("engagement_survey_questions")
+}
+
+model EngagementSurveyAssignment {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  survey_id    String    @map("survey_id") @db.Uuid
+  employee_id  String    @map("employee_id") @db.Uuid
+  status       String    @default("Pending")
+  completed_at DateTime? @map("completed_at") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  survey    EngagementSurvey @relation(fields: [survey_id], references: [id], onDelete: Cascade)
+  responses EngagementSurveyResponse[]
+
+  @@unique([survey_id, employee_id])
+  @@index([employee_id])
+  @@map("engagement_survey_assignments")
+}
+
+model EngagementSurveyResponse {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignment_id String   @map("assignment_id") @db.Uuid
+  question_id   String   @map("question_id") @db.Uuid
+  answer_text   String?  @map("answer_text")
+  answer_rating Int?     @map("answer_rating")
+  created_at    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assignment EngagementSurveyAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  question   EngagementSurveyQuestion   @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@unique([assignment_id, question_id])
+  @@map("engagement_survey_responses")
+}
+
+model EngagementFeedback {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String    @map("employee_id") @db.Uuid
+  category    String    @default("General")
+  message     String
+  status      String    @default("Submitted")
+  reviewed_by String?   @map("reviewed_by") @db.Uuid
+  reviewed_at DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@map("engagement_feedback")
+}
+
+model EngagementWellnessCheckin {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id  String   @map("employee_id") @db.Uuid
+  mood_score   Int      @map("mood_score")
+  stress_level Int?     @map("stress_level")
+  notes        String?
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@map("engagement_wellness_checkins")
+}
+
+model EngagementRecognition {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  points      Int      @default(0)
+  badge       String?
+  reason      String?
+  awarded_by  String?  @map("awarded_by") @db.Uuid
+  awarded_at  DateTime @default(now()) @map("awarded_at") @db.Timestamptz(6)
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@map("engagement_recognition")
+}
+
+model EngagementPulsePoll {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  question   String
+  status     String    @default("Active")
+  closes_at  DateTime? @map("closes_at") @db.Timestamptz(6)
+  created_by String?   @map("created_by") @db.Uuid
+  created_at DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  responses EngagementPulseResponse[]
+
+  @@map("engagement_pulse_polls")
+}
+
+model EngagementPulseResponse {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  poll_id     String   @map("poll_id") @db.Uuid
+  employee_id String   @map("employee_id") @db.Uuid
+  response    String
+  created_at  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  poll EngagementPulsePoll @relation(fields: [poll_id], references: [id], onDelete: Cascade)
+
+  @@unique([poll_id, employee_id])
+  @@map("engagement_pulse_responses")
+}
+
+model ErCase {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  case_no             String    @unique @map("case_no")
+  employee_id         String    @map("employee_id") @db.Uuid
+  subject             String
+  description         String
+  category            String    @default("Concern")
+  status              String    @default("Intake")
+  priority            String    @default("Medium")
+  assigned_to         String?   @map("assigned_to") @db.Uuid
+  investigation_notes String?   @map("investigation_notes")
+  corrective_action   String?   @map("corrective_action")
+  resolution_summary  String?   @map("resolution_summary")
+  resolved_at         DateTime? @map("resolved_at") @db.Timestamptz(6)
+  resolved_by         String?   @map("resolved_by") @db.Uuid
+  created_at          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employee_id])
+  @@index([status])
+  @@map("er_cases")
+}
+
+model LmsCourse {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title          String
+  description    String?
+  duration_hours Decimal   @default(1) @map("duration_hours") @db.Decimal(5, 1)
+  category       String?
+  status         String    @default("Draft")
+  content        String?
+  created_by     String?   @map("created_by") @db.Uuid
+  published_at   DateTime? @map("published_at") @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  assignments  LmsCourseAssignment[]
+  assessments  LmsAssessment[]
+  certificates LmsCertificate[]
+
+  @@index([status])
+  @@map("lms_courses")
+}
+
+model LmsCourseAssignment {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id   String    @map("course_id") @db.Uuid
+  employee_id String    @map("employee_id") @db.Uuid
+  status      String    @default("Assigned")
+  progress    Int       @default(0)
+  due_date    DateTime? @map("due_date") @db.Date
+  completed_at DateTime? @map("completed_at") @db.Timestamptz(6)
+  assigned_by String?   @map("assigned_by") @db.Uuid
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  course LmsCourse @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([course_id, employee_id])
+  @@index([employee_id])
+  @@map("lms_course_assignments")
+}
+
+model LmsAssessment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id  String   @map("course_id") @db.Uuid
+  title      String
+  pass_score Int      @default(70) @map("pass_score")
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  course    LmsCourse @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  questions LmsAssessmentQuestion[]
+  results   LmsAssessmentResult[]
+
+  @@map("lms_assessments")
+}
+
+model LmsAssessmentQuestion {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assessment_id  String   @map("assessment_id") @db.Uuid
+  question_text  String   @map("question_text")
+  correct_answer String   @map("correct_answer")
+  options        Json     @default("[]")
+  sort_order     Int      @default(0) @map("sort_order")
+  created_at     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  assessment LmsAssessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+
+  @@map("lms_assessment_questions")
+}
+
+model LmsAssessmentResult {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assessment_id String   @map("assessment_id") @db.Uuid
+  employee_id   String   @map("employee_id") @db.Uuid
+  score         Int
+  passed        Boolean  @default(false)
+  submitted_at  DateTime @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  assessment LmsAssessment @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@map("lms_assessment_results")
+}
+
+model LmsCertificate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id    String   @map("course_id") @db.Uuid
+  name         String
+  valid_months Int?     @map("valid_months")
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  course              LmsCourse @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  employee_certificates LmsEmployeeCertificate[]
+
+  @@map("lms_certificates")
+}
+
+model LmsEmployeeCertificate {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  certificate_id String    @map("certificate_id") @db.Uuid
+  employee_id    String    @map("employee_id") @db.Uuid
+  issued_at      DateTime  @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expires_at     DateTime? @map("expires_at") @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  certificate LmsCertificate @relation(fields: [certificate_id], references: [id], onDelete: Cascade)
+
+  @@unique([certificate_id, employee_id])
+  @@map("lms_employee_certificates")
+}
+
+model LmsAnnouncement {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  body         String
+  status       String    @default("Published")
+  published_at DateTime? @map("published_at") @db.Timestamptz(6)
+  created_by   String?   @map("created_by") @db.Uuid
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("lms_announcements")
+}
